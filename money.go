@@ -103,7 +103,7 @@ func (amount *UsdAmount) FormatValue() string {
 	}
 }
 
-var inrSignifiers = regexp.MustCompile(`lakh|crore|arab|rs|inr|₹|rupee`)
+var inrSignifiers = regexp.MustCompile(`lakh|crore|rs|inr|₹|rupee`)
 var usdSignifiers = regexp.MustCompile(`million|billion|trillion|\$|usd|dollar`)
 
 func parseAmount(s string) (Amount, error) {
