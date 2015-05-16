@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -17,7 +20,6 @@ func parseNumber(s string) float64 {
 const (
 	Lakh  = 100000.0
 	Crore = 10000000.0
-	Arab  = 1000000000.0
 )
 
 type InrAmount struct {
@@ -40,7 +42,7 @@ type Amount interface {
 }
 
 func NewInrAmount(s string) *InrAmount {
-	units := regexp.MustCompile("lakh|crore|arab")
+	units := regexp.MustCompile(`lakh|crore`)
 	unit := units.FindString(s)
 	number := parseNumber(s)
 
@@ -49,8 +51,6 @@ func NewInrAmount(s string) *InrAmount {
 		return &InrAmount{Value: number * Lakh}
 	case "crore":
 		return &InrAmount{Value: number * Crore}
-	case "arab":
-		return &InrAmount{Value: number * Arab}
 	default:
 		return &InrAmount{Value: number}
 	}
@@ -61,14 +61,12 @@ func (amount *InrAmount) Convert(usdToInr float64) Amount {
 }
 
 func (amount *InrAmount) FormatValue() string {
-	if v := amount.Value / Arab; v >= 1.0 {
-		return fmt.Sprintf("₹ %.1f arab", v)
-	} else if v := amount.Value / Crore; v >= 1.0 {
+	if v := amount.Value / Crore; v >= 1.0 {
 		return fmt.Sprintf("₹ %.1f crore", v)
 	} else if v := amount.Value / Lakh; v >= 1.0 {
 		return fmt.Sprintf("₹ %.1f lakh", v)
 	} else {
-		return ""
+		return fmt.Sprintf("₹ %.1f", amount.Value)
 	}
 }
 
@@ -101,7 +99,7 @@ func (amount *UsdAmount) FormatValue() string {
 	} else if v := amount.Value / Million; v >= 1.0 {
 		return fmt.Sprintf("$ %.1f million", v)
 	} else {
-		return ""
+		return fmt.Sprintf("$ %.1f", amount.Value)
 	}
 }
 
@@ -118,12 +116,41 @@ func parseAmount(s string) (Amount, error) {
 	}
 }
 
+type FixerResponse struct {
+	Rates map[string]float64 `json:"rates"`
+}
+
+func getUsdToInr() (float64, error) {
+	r, err := http.Get("http://api.fixer.io/latest?base=USD")
+	if err != nil {
+		return 0, err
+	}
+	defer r.Body.Close()
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return 0, err
+	}
+
+	var response FixerResponse
+	if err = json.Unmarshal(body, &response); err != nil {
+		return 0, err
+	}
+
+	return response.Rates["INR"], nil
+}
+
 func main() {
 	input := strings.Join(os.Args[1:], " ")
 	amount, err := parseAmount(input)
-	if err == nil {
-		fmt.Println(amount.Convert(62.0).FormatValue())
-	} else {
+	if err != nil {
 		fmt.Println(err.Error())
 	}
+
+	usdToInr, err := getUsdToInr()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	fmt.Println(amount.Convert(usdToInr).FormatValue())
 }
