@@ -120,24 +120,26 @@ type FixerResponse struct {
 	Rates map[string]float64 `json:"rates"`
 }
 
-func getUsdToInr() (float64, error) {
+func getUsdToInr() float64 {
+	defaultRate := 62.0
+
 	r, err := http.Get("http://api.fixer.io/latest?base=USD")
 	if err != nil {
-		return 0, err
+		return defaultRate
 	}
 	defer r.Body.Close()
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return 0, err
+		return defaultRate
 	}
 
 	var response FixerResponse
 	if err = json.Unmarshal(body, &response); err != nil {
-		return 0, err
+		return defaultRate
 	}
 
-	return response.Rates["INR"], nil
+	return response.Rates["INR"]
 }
 
 func main() {
@@ -147,10 +149,5 @@ func main() {
 		fmt.Println(err.Error())
 	}
 
-	usdToInr, err := getUsdToInr()
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-
-	fmt.Println(amount.Convert(usdToInr).FormatValue())
+	fmt.Println(amount.Convert(getUsdToInr()).FormatValue())
 }
