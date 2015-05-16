@@ -1,64 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
-
-type Amount struct {
-	Currency string
-	Value    float64
-}
-
-var indianUnits = map[string]uint64{"arab": 1000000000, "crore": 10000000, "lakh": 100000}
-var usUnits = map[string]uint64{"trillion": 1000000000000, "billion": 1000000000, "million": 1000000}
-
-var multipliersFor = map[string]map[string]uint64{"inr": indianUnits, "usd": usUnits}
-
-// return all keys of the map
-func keys(m map[string]uint64) []string {
-	ks := make([]string, 0)
-	for k, _ := range m {
-		ks = append(ks, k)
-	}
-	return ks
-}
-
-// true if s contains val, returns val
-func contains(s []string, val string) (bool, string) {
-	for _, u := range s {
-		if strings.Contains(strings.ToLower(val), u) {
-			return true, u
-		}
-	}
-	return false, ""
-}
-
-var inrSignifiers = append(keys(indianUnits), []string{"rs", "inr", "₹", "rupee"}...)
-var usdSignifiers = append(keys(usUnits), []string{"$", "usd", "dollar"}...)
-
-func parseCurrency(s string) string {
-	if c, _ := contains(inrSignifiers, s); c {
-		return "inr"
-	} else if c, _ := contains(usdSignifiers, s); c {
-		return "usd"
-	} else {
-		return ""
-	}
-}
-
-func parseMultiplier(s string) uint64 {
-	if c, v := contains(keys(indianUnits), s); c {
-		return indianUnits[v]
-	}
-
-	if c, v := contains(keys(usUnits), s); c {
-		return usUnits[v]
-	}
-
-	return 1
-}
 
 func parseNumber(s string) float64 {
 	var value float64
@@ -66,66 +14,116 @@ func parseNumber(s string) float64 {
 	return value
 }
 
-func parse(s string) Amount {
-	currency := parseCurrency(s)
-	multiplier := parseMultiplier(s)
+const (
+	Lakh  = 100000.0
+	Crore = 10000000.0
+	Arab  = 1000000000.0
+)
+
+type InrAmount struct {
+	Value float64
+}
+
+const (
+	Million  = 1000000.0
+	Billion  = 1000000000.0
+	Trillion = 1000000000000.0
+)
+
+type UsdAmount struct {
+	Value float64
+}
+
+type Amount interface {
+	Convert(usdToInr float64) Amount
+	FormatValue() string
+}
+
+func NewInrAmount(s string) *InrAmount {
+	units := regexp.MustCompile("lakh|crore|arab")
+	unit := units.FindString(s)
 	number := parseNumber(s)
 
-	return Amount{Currency: currency, Value: float64(multiplier) * number}
-}
-
-// convert from one currency to the other
-func convert(amount Amount) Amount {
-	switch amount.Currency {
-	case "inr":
-		return Amount{Currency: "usd", Value: amount.Value / 62.0}
-	case "usd":
-		return Amount{Currency: "inr", Value: amount.Value * 62.0}
+	switch unit {
+	case "lakh":
+		return &InrAmount{Value: number * Lakh}
+	case "crore":
+		return &InrAmount{Value: number * Crore}
+	case "arab":
+		return &InrAmount{Value: number * Arab}
 	default:
-		return Amount{}
+		return &InrAmount{Value: number}
 	}
 }
 
-func symbolFor(amount Amount) string {
-	switch amount.Currency {
-	case "inr":
-		return "₹"
-	case "usd":
-		return "$"
-	default:
+func (amount *InrAmount) Convert(usdToInr float64) Amount {
+	return &UsdAmount{Value: amount.Value / usdToInr}
+}
+
+func (amount *InrAmount) FormatValue() string {
+	if v := amount.Value / Arab; v >= 1.0 {
+		return fmt.Sprintf("₹ %.1f arab", v)
+	} else if v := amount.Value / Crore; v >= 1.0 {
+		return fmt.Sprintf("₹ %.1f crore", v)
+	} else if v := amount.Value / Lakh; v >= 1.0 {
+		return fmt.Sprintf("₹ %.1f lakh", v)
+	} else {
 		return ""
 	}
 }
 
-func otherCurrency(currency string) string {
-	switch currency {
-	case "inr":
-		return "usd"
-	case "usd":
-		return "inr"
+func NewUsdAmount(s string) *UsdAmount {
+	units := regexp.MustCompile("million|billion|trillion")
+	unit := units.FindString(s)
+	number := parseNumber(s)
+
+	switch unit {
+	case "million":
+		return &UsdAmount{Value: number * Million}
+	case "billion":
+		return &UsdAmount{Value: number * Billion}
+	case "trillion":
+		return &UsdAmount{Value: number * Trillion}
 	default:
+		return &UsdAmount{Value: number}
+	}
+}
+
+func (amount *UsdAmount) Convert(usdToInr float64) Amount {
+	return &InrAmount{Value: amount.Value * usdToInr}
+}
+
+func (amount *UsdAmount) FormatValue() string {
+	if v := amount.Value / Trillion; v >= 1.0 {
+		return fmt.Sprintf("$ %.1f trillion", v)
+	} else if v := amount.Value / Billion; v >= 1.0 {
+		return fmt.Sprintf("$ %.1f billion", v)
+	} else if v := amount.Value / Million; v >= 1.0 {
+		return fmt.Sprintf("$ %.1f million", v)
+	} else {
 		return ""
 	}
 }
 
-func humanDivisorFor(amount Amount) (string, uint64) {
-	multipliers := multipliersFor[amount.Currency]
-	for k, v := range multipliers {
-		if amount.Value/float64(v) > 1 {
-			return k, v
-		}
+var inrSignifiers = regexp.MustCompile(`lakh|crore|arab|rs|inr|₹|rupee`)
+var usdSignifiers = regexp.MustCompile(`million|billion|trillion|\$|usd|dollar`)
+
+func parseAmount(s string) (Amount, error) {
+	if inrSignifiers.MatchString(s) {
+		return NewInrAmount(s), nil
+	} else if usdSignifiers.MatchString(s) {
+		return NewUsdAmount(s), nil
+	} else {
+		return nil, errors.New("no currency recognized")
 	}
-
-	return "", 1
-}
-
-func humanize(amount Amount) string {
-	symbol := symbolFor(amount)
-	unit, divisor := humanDivisorFor(amount)
-	return fmt.Sprintf("%s%.1f %s", symbol, amount.Value/float64(divisor), unit)
 }
 
 func main() {
-	amount := convert(parse(strings.Join(os.Args[1:], " ")))
-	fmt.Println(humanize(amount))
+	input := strings.Join(os.Args[1:], " ")
+	amount, err := parseAmount(input)
+	if err == nil {
+		fmt.Println(amount.Convert(62.0).FormatValue())
+	} else {
+		fmt.Println(err.Error())
+	}
 }
