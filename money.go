@@ -11,10 +11,15 @@ import (
 	"strings"
 )
 
-func parseNumber(s string) float64 {
+func parseNumber(s string) (float64, error) {
 	var value float64
-	fmt.Sscanf(s, "%f", &value)
-	return value
+	n, err := fmt.Sscanf(s, "%f", &value)
+
+	if n != 1 || err != nil {
+		return 0, errors.New("invalid number")
+	} else {
+		return value, nil
+	}
 }
 
 const (
@@ -41,18 +46,22 @@ type Amount interface {
 	FormatValue() string
 }
 
-func NewInrAmount(s string) *InrAmount {
+func NewInrAmount(s string) (*InrAmount, error) {
 	units := regexp.MustCompile(`lakh|crore`)
 	unit := units.FindString(s)
-	number := parseNumber(s)
+	number, err := parseNumber(s)
+
+	if err != nil {
+		return nil, err
+	}
 
 	switch unit {
 	case "lakh":
-		return &InrAmount{Value: number * Lakh}
+		return &InrAmount{Value: number * Lakh}, nil
 	case "crore":
-		return &InrAmount{Value: number * Crore}
+		return &InrAmount{Value: number * Crore}, nil
 	default:
-		return &InrAmount{Value: number}
+		return &InrAmount{Value: number}, nil
 	}
 }
 
@@ -70,20 +79,24 @@ func (amount *InrAmount) FormatValue() string {
 	}
 }
 
-func NewUsdAmount(s string) *UsdAmount {
+func NewUsdAmount(s string) (*UsdAmount, error) {
 	units := regexp.MustCompile("million|billion|trillion")
 	unit := units.FindString(s)
-	number := parseNumber(s)
+	number, err := parseNumber(s)
+
+	if err != nil {
+		return nil, err
+	}
 
 	switch unit {
 	case "million":
-		return &UsdAmount{Value: number * Million}
+		return &UsdAmount{Value: number * Million}, nil
 	case "billion":
-		return &UsdAmount{Value: number * Billion}
+		return &UsdAmount{Value: number * Billion}, nil
 	case "trillion":
-		return &UsdAmount{Value: number * Trillion}
+		return &UsdAmount{Value: number * Trillion}, nil
 	default:
-		return &UsdAmount{Value: number}
+		return &UsdAmount{Value: number}, nil
 	}
 }
 
@@ -108,9 +121,9 @@ var usdSignifiers = regexp.MustCompile(`million|billion|trillion|\$|usd|dollar`)
 
 func parseAmount(s string) (Amount, error) {
 	if inrSignifiers.MatchString(s) {
-		return NewInrAmount(s), nil
+		return NewInrAmount(s)
 	} else if usdSignifiers.MatchString(s) {
-		return NewUsdAmount(s), nil
+		return NewUsdAmount(s)
 	} else {
 		return nil, errors.New("no currency recognized")
 	}
@@ -143,10 +156,16 @@ func getUsdToInr() float64 {
 }
 
 func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("no input given")
+		os.Exit(1)
+	}
+
 	input := strings.Join(os.Args[1:], " ")
 	amount, err := parseAmount(input)
 	if err != nil {
 		fmt.Println(err.Error())
+		os.Exit(1)
 	}
 
 	fmt.Println(amount.Convert(getUsdToInr()).FormatValue())
