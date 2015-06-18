@@ -17,7 +17,7 @@ type RateCache struct {
 
 var cachedRate RateCache
 
-// expired() returns true if the cache is more than an hour old.
+// expired returns true if the cache is more than an hour old.
 func expired() bool {
 	return cachedRate.UpdatedAt.Before(time.Now().Add(-time.Duration(60) * time.Minute))
 }
