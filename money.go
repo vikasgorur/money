@@ -1,4 +1,4 @@
-package main
+package money
 
 import (
 	"encoding/json"
@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"regexp"
-	"strings"
 )
 
 func parseNumber(s string) (float64, error) {
@@ -23,21 +21,21 @@ func parseNumber(s string) (float64, error) {
 }
 
 const (
-	Lakh  = 100000.0
-	Crore = 10000000.0
+	lakh  = 100000.0
+	crore = 10000000.0
 )
 
-type InrAmount struct {
+type inrAmount struct {
 	Value float64
 }
 
 const (
-	Million  = 1000000.0
-	Billion  = 1000000000.0
-	Trillion = 1000000000000.0
+	million  = 1000000.0
+	billion  = 1000000000.0
+	trillion = 1000000000000.0
 )
 
-type UsdAmount struct {
+type usdAmount struct {
 	Value float64
 }
 
@@ -46,7 +44,7 @@ type Amount interface {
 	FormatValue() string
 }
 
-func NewInrAmount(s string) (*InrAmount, error) {
+func newInrAmount(s string) (*inrAmount, error) {
 	units := regexp.MustCompile(`lakh|crore`)
 	unit := units.FindString(s)
 	number, err := parseNumber(s)
@@ -57,29 +55,29 @@ func NewInrAmount(s string) (*InrAmount, error) {
 
 	switch unit {
 	case "lakh":
-		return &InrAmount{Value: number * Lakh}, nil
+		return &inrAmount{Value: number * lakh}, nil
 	case "crore":
-		return &InrAmount{Value: number * Crore}, nil
+		return &inrAmount{Value: number * crore}, nil
 	default:
-		return &InrAmount{Value: number}, nil
+		return &inrAmount{Value: number}, nil
 	}
 }
 
-func (amount *InrAmount) Convert(usdToInr float64) Amount {
-	return &UsdAmount{Value: amount.Value / usdToInr}
+func (amount *inrAmount) Convert(usdToInr float64) Amount {
+	return &usdAmount{Value: amount.Value / usdToInr}
 }
 
-func (amount *InrAmount) FormatValue() string {
-	if v := amount.Value / Crore; v >= 1.0 {
+func (amount *inrAmount) FormatValue() string {
+	if v := amount.Value / crore; v >= 1.0 {
 		return fmt.Sprintf("₹ %.1f crore", v)
-	} else if v := amount.Value / Lakh; v >= 1.0 {
+	} else if v := amount.Value / lakh; v >= 1.0 {
 		return fmt.Sprintf("₹ %.1f lakh", v)
 	} else {
 		return fmt.Sprintf("₹ %.1f", amount.Value)
 	}
 }
 
-func NewUsdAmount(s string) (*UsdAmount, error) {
+func newUsdAmount(s string) (*usdAmount, error) {
 	units := regexp.MustCompile("million|billion|trillion")
 	unit := units.FindString(s)
 	number, err := parseNumber(s)
@@ -90,26 +88,26 @@ func NewUsdAmount(s string) (*UsdAmount, error) {
 
 	switch unit {
 	case "million":
-		return &UsdAmount{Value: number * Million}, nil
+		return &usdAmount{Value: number * million}, nil
 	case "billion":
-		return &UsdAmount{Value: number * Billion}, nil
+		return &usdAmount{Value: number * billion}, nil
 	case "trillion":
-		return &UsdAmount{Value: number * Trillion}, nil
+		return &usdAmount{Value: number * trillion}, nil
 	default:
-		return &UsdAmount{Value: number}, nil
+		return &usdAmount{Value: number}, nil
 	}
 }
 
-func (amount *UsdAmount) Convert(usdToInr float64) Amount {
-	return &InrAmount{Value: amount.Value * usdToInr}
+func (amount *usdAmount) Convert(usdToInr float64) Amount {
+	return &inrAmount{Value: amount.Value * usdToInr}
 }
 
-func (amount *UsdAmount) FormatValue() string {
-	if v := amount.Value / Trillion; v >= 1.0 {
+func (amount *usdAmount) FormatValue() string {
+	if v := amount.Value / trillion; v >= 1.0 {
 		return fmt.Sprintf("$ %.1f trillion", v)
-	} else if v := amount.Value / Billion; v >= 1.0 {
+	} else if v := amount.Value / billion; v >= 1.0 {
 		return fmt.Sprintf("$ %.1f billion", v)
-	} else if v := amount.Value / Million; v >= 1.0 {
+	} else if v := amount.Value / million; v >= 1.0 {
 		return fmt.Sprintf("$ %.1f million", v)
 	} else {
 		return fmt.Sprintf("$ %.1f", amount.Value)
@@ -119,11 +117,11 @@ func (amount *UsdAmount) FormatValue() string {
 var inrSignifiers = regexp.MustCompile(`lakh|crore|rs|inr|₹|rupee`)
 var usdSignifiers = regexp.MustCompile(`million|billion|trillion|\$|usd|dollar`)
 
-func parseAmount(s string) (Amount, error) {
+func ParseAmount(s string) (Amount, error) {
 	if inrSignifiers.MatchString(s) {
-		return NewInrAmount(s)
+		return newInrAmount(s)
 	} else if usdSignifiers.MatchString(s) {
-		return NewUsdAmount(s)
+		return newUsdAmount(s)
 	} else {
 		return nil, errors.New("no currency recognized")
 	}
@@ -133,7 +131,7 @@ type FixerResponse struct {
 	Rates map[string]float64 `json:"rates"`
 }
 
-func getUsdToInr() float64 {
+func GetUsdToInr() float64 {
 	defaultRate := 62.0
 
 	r, err := http.Get("http://api.fixer.io/latest?base=USD")
@@ -153,20 +151,4 @@ func getUsdToInr() float64 {
 	}
 
 	return response.Rates["INR"]
-}
-
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("no input given")
-		os.Exit(1)
-	}
-
-	input := strings.Join(os.Args[1:], " ")
-	amount, err := parseAmount(input)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	fmt.Println(amount.Convert(getUsdToInr()).FormatValue())
 }
