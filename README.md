@@ -14,5 +14,9 @@ $ money 1.2 million
 ₹ 7.6 crore
 ```
 
+### Web app
+
+Try this [on the web](http://money-983.appspot.com/).
+
 
 
