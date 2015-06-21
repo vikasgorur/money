@@ -1,4 +1,4 @@
-package main
+package web
 
 import (
 	"encoding/json"
@@ -69,10 +69,9 @@ func handleConvert(w http.ResponseWriter, r *http.Request) {
 	log.Printf("converted '%s' to '%s'", input, output)
 }
 
-func main() {
+func init() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", handleRoot).Methods("GET")
 	r.HandleFunc("/convert", handleConvert).Methods("GET")
-
-	http.ListenAndServe(":8080", r)
+	http.Handle("/", r)
 }
