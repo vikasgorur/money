@@ -15,11 +15,11 @@ func main() {
 	}
 
 	input := strings.Join(os.Args[1:], " ")
-	amount, err := money.ParseAmount(input)
+	amount, err := money.Parse(input)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	fmt.Println(amount.Convert(money.GetUsdToInr()).FormatValue())
+	fmt.Println(amount.Convert(money.GetUsdToInr()))
 }

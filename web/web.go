@@ -2,8 +2,12 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path"
+	"text/template"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -34,8 +38,24 @@ func getCachedRate() float64 {
 	return cachedRate.UsdToInr
 }
 
+func renderTemplate(w http.ResponseWriter, name string, value interface{}) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	t, err := template.ParseFiles(path.Join(cwd, "static", name))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	t.Execute(w, value)
+}
+
 func handleRoot(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	renderTemplate(w, "index.html", nil)
 }
 
 type ConvertResponse struct {
@@ -44,14 +64,14 @@ type ConvertResponse struct {
 
 func handleConvert(w http.ResponseWriter, r *http.Request) {
 	input := r.FormValue("text")
-	amount, err := money.ParseAmount(input)
+	amount, err := money.Parse(input)
 	if err != nil {
 		log.Println("invalid input: " + input)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	output := amount.Convert(getCachedRate()).FormatValue()
+	output := fmt.Sprint(amount.Convert(getCachedRate()))
 	response, err := json.Marshal(ConvertResponse{Text: output})
 
 	if err != nil {
@@ -71,6 +91,9 @@ func handleConvert(w http.ResponseWriter, r *http.Request) {
 
 func init() {
 	r := mux.NewRouter()
+	r.PathPrefix("/css/").Handler(http.StripPrefix("/css/", http.FileServer(http.Dir("static/css/"))))
+	r.PathPrefix("/js/").Handler(http.StripPrefix("/js/", http.FileServer(http.Dir("static/js/"))))
+
 	r.HandleFunc("/", handleRoot).Methods("GET")
 	r.HandleFunc("/convert", handleConvert).Methods("GET")
 	http.Handle("/", r)
