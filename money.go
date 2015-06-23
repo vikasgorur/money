@@ -89,7 +89,7 @@ type Parser interface {
 type InrParser struct{}
 
 func (p InrParser) Match(s string) bool {
-	return regexp.MustCompile(`lakh|crore|rs|inr|₹|rupee`).MatchString(s)
+	return regexp.MustCompile(`(?i:lakh|crore|rs|inr|₹|rupee)`).MatchString(s)
 }
 
 func (p InrParser) Parse(s string) (Converter, error) {
@@ -115,7 +115,7 @@ func (p InrParser) Parse(s string) (Converter, error) {
 type UsdParser struct{}
 
 func (p UsdParser) Match(s string) bool {
-	return regexp.MustCompile(`million|billion|trillion|\$|usd|dollar`).MatchString(s)
+	return regexp.MustCompile(`(?i:million|billion|trillion|\$|usd|dollar)`).MatchString(s)
 }
 
 func (p UsdParser) Parse(s string) (Converter, error) {
