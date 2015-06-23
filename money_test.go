@@ -17,7 +17,7 @@ func TestUsdMatch(t *testing.T) {
 	a.True(p.Match("5 dollar"))
 
 	a.True(p.Match("9 million"))
-	a.True(p.Match("10 billion"))
+	a.True(p.Match("10 Billion"))
 	a.True(p.Match("10 trillion"))
 
 	a.False(p.Match("₹100"))
@@ -36,7 +36,7 @@ func TestInrMatch(t *testing.T) {
 	a.True(p.Match("rs..67"))
 
 	a.True(p.Match("₹100"))
-	a.True(p.Match("9 lakh"))
+	a.True(p.Match("9 LAKH"))
 	a.True(p.Match("50 crore"))
 
 	a.False(p.Match("$100"))
