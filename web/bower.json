@@ -1,0 +1,21 @@
+{
+  "name": "money",
+  "version": "0.0.1",
+  "authors": [
+    "Vikas Gorur <vikasgp@gmail.com>"
+  ],
+  "description": "web app for money",
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "static/js/components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "react": "~0.13.3",
+    "jquery": "~2.1.4"
+  }
+}

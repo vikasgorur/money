@@ -1,2 +1,4 @@
 web/web
 money/money
+**/.module-cache
+web/static/js/components/jquery/src/*
